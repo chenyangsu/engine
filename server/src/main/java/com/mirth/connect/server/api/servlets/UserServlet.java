@@ -45,12 +45,24 @@ import com.mirth.connect.server.util.UserSessionCache;
 
 public class UserServlet extends MirthServlet implements UserServletInterface {
 
-    private static final UserController userController = ControllerFactory.getFactory().createUserController();
-    private static final EventController eventController = ControllerFactory.getFactory().createEventController();
-    private static final ConfigurationController configurationController = ControllerFactory.getFactory().createConfigurationController();
+    private static UserController userController;
+    private static EventController eventController;
+    private static ConfigurationController configurationController;
 
     public UserServlet(@Context HttpServletRequest request, @Context SecurityContext sc) {
         super(request, sc, false);
+    }
+
+    public UserServlet(@Context HttpServletRequest request, @Context SecurityContext sc, ControllerFactory controllerFactory) {
+        super(request, null, sc, false, controllerFactory);
+    }
+
+    @Override
+    protected void initializeControllers() {
+        super.initializeControllers();
+        userController = controllerFactory.createUserController();
+        eventController = controllerFactory.createEventController();
+        configurationController = controllerFactory.createConfigurationController();
     }
 
     @Override
@@ -269,10 +281,19 @@ public class UserServlet extends MirthServlet implements UserServletInterface {
     @Override
     @CheckAuthorizedUserId
     public void updateUser(Integer userId, User user) {
-    	if (StringUtils.isBlank(user.getUsername())) {
-    		throw new MirthApiException(Response.status(Response.Status.BAD_REQUEST).entity("username cannot be blank.").build());
-    	}
-    	
+        if (user == null) {
+            throw new MirthApiException(Response.status(Response.Status.BAD_REQUEST).entity("user cannot be null.").build());
+        }
+        if (user.getId() != null && !user.getId().equals(userId)) {
+            throw new MirthApiException(Response.status(Response.Status.BAD_REQUEST).entity("User ID in request body does not match path parameter.").build());
+        }
+        if (StringUtils.isBlank(user.getUsername())) {
+            throw new MirthApiException(Response.status(Response.Status.BAD_REQUEST).entity("username cannot be blank.").build());
+        }
+        if (user.getId() == null) {
+            user.setId(userId);
+        }
+
         try {
             userController.updateUser(user);
         } catch (ControllerException e) {
